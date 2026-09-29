@@ -1,36 +1,103 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TokenForge: create Solana tokens on devnet
 
-## Getting Started
+[![CI](https://github.com/Waleed-Ilyas/tokenforge/actions/workflows/ci.yml/badge.svg)](https://github.com/Waleed-Ilyas/tokenforge/actions/workflows/ci.yml)
+![License: MIT](https://img.shields.io/badge/license-MIT-2ee6a6)
+![Next.js 15](https://img.shields.io/badge/Next.js-15-black)
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
+![Network: devnet](https://img.shields.io/badge/network-devnet%20only-8b5cf6)
 
-First, run the development server:
+Create an SPL or Token-2022 token with a name, symbol and supply in a single transaction, then mint more or send it to anyone. Connect Phantom, Solflare or Backpack.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+**Live demo:** LIVE_URL · **Personal project.** Devnet only: the tokens have no value and nothing here sends a mainnet transaction.
+
+## Demo accounts
+
+There are no accounts. Connect any wallet set to devnet and use the **Airdrop 1 devnet SOL** button (or [faucet.solana.com](https://faucet.solana.com) if the public faucet is rate limited).
+
+## Program IDs (devnet)
+
+| Program                                   | Address                                        |
+| ----------------------------------------- | ---------------------------------------------- |
+| SPL Token                                 | `TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA`  |
+| Token-2022                                | `TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb`  |
+| Associated Token Account                  | `ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL` |
+| Metaplex Token Metadata (SPL tokens only) | `metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s`  |
+
+TokenForge deploys no program of its own. It composes these audited programs.
+
+## Features
+
+- **One-transaction launch:** create the mint, attach metadata, create your token account and mint the supply, all atomically. If any step fails, nothing is created.
+- **Two standards:** classic SPL Token with Metaplex metadata, or Token-2022 with the metadata stored on the mint itself (metadata-pointer and token-metadata extensions).
+- **Fixed supply option:** give up the mint authority right after minting, so nobody can ever create more.
+- **My tokens:** everything the wallet holds, with names and symbols resolved, a copyable mint address and an explorer link. **Send** creates the recipient's token account when needed. **Mint more** only appears when you are the mint authority.
+- **Metadata without uploads:** the app serves the Metaplex JSON and a generated SVG badge itself (`/api/meta`, `/api/token-image`), so there is no database and no file upload. Custom images are accepted as https links.
+- **Exact amounts:** supply and transfer amounts are parsed with string arithmetic into `bigint` base units. No floating point, decimals and u64 limits enforced.
+- **Devnet tooling:** devnet banner, one-click airdrop, explorer links on every transaction and mint.
+- **Clear errors:** wallet rejection, insufficient SOL, rate limits and expiry each get a plain-language message. Validation is shown next to the field that is wrong.
+
+## Tech stack
+
+Next.js 15 (App Router), TypeScript strict, Tailwind CSS v4, `@solana/web3.js`, `@solana/spl-token`, `@solana/spl-token-metadata`, `@metaplex-foundation/mpl-token-metadata`, `@solana/wallet-adapter`, Zod, Vitest, LiteSVM, ESLint, Prettier, GitHub Actions.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  W[Wallet<br/>Phantom, Solflare, Backpack] <-->|sign| UI[React UI<br/>useTx hook]
+  UI --> B[lib/tx.ts<br/>instruction builders]
+  B --> SPL[SPL Token or Token-2022]
+  B --> ATA[Associated Token Account]
+  B --> MPL[Metaplex Token Metadata<br/>SPL tokens]
+  UI -->|send and confirm| RPC[(Solana devnet RPC)]
+  MPL -. uri .-> API[/api/meta and /api/token-image/]
+  T[Vitest + LiteSVM<br/>real programs, in process] --> B
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`lib/tx.ts` only builds instructions. The browser signs them with the wallet, the tests sign them with a keypair, so the exact code that ships is the code that is tested.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Getting started
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+git clone https://github.com/Waleed-Ilyas/tokenforge.git && cd tokenforge
+pnpm install
+cp .env.example .env.local   # optional
+pnpm dev                     # http://localhost:3000
+```
 
-## Learn More
+Set `NEXT_PUBLIC_SOLANA_RPC` to a Helius or other devnet endpoint if the public one rate limits you.
 
-To learn more about Next.js, take a look at the following resources:
+## Tests
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+pnpm test              # unit tests, plus the LiteSVM suite on Linux and macOS
+pnpm lint && pnpm typecheck
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Unit tests** cover amount parsing (exactness, u64, decimals), form validation, the metadata link limit, and the shape of every transaction the builders produce.
+- **Integration tests (LiteSVM)** execute the builders against the real SPL Token, Token-2022, Associated Token and Metaplex Token Metadata programs in an in-process Solana VM, and check the resulting on-chain state: mint decimals and supply, authority revoked for fixed supply, Metaplex metadata contents, Token-2022 metadata extension contents, minting more, transfers to a wallet with no token account, and rejection of over-balance and wrong-decimals transfers. `tests/fixtures/mpl_token_metadata.so` is the deployed program dumped by `scripts/dump-programs.mjs`.
+- LiteSVM ships native binaries for Linux and macOS only, so on Windows that suite is skipped automatically. GitHub Actions runs it on every push.
 
-## Deploy on Vercel
+## Key engineering decisions
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **Builders separate from signing.** The same instruction code runs in the browser and in tests.
+- **Rent is computed per standard.** Token-2022 pays for its metadata up front because writing metadata grows the mint account, so `mintRent` sizes the account from the extension layout.
+- **Atomic creation.** One transaction, so there are no half-created tokens to clean up.
+- **`createAssociatedTokenAccountIdempotent` everywhere,** so minting and sending never fail because an account already exists.
+- **Metadata URI has a hard 200-character limit.** Instead of truncating silently, the form says how many characters it needs and what to shorten.
+- **Whitelisted inputs on the API routes.** The metadata route only passes through https images, and the badge route only accepts `A-Z0-9`, so neither can inject markup.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## What I'd improve next
+
+- Upload images and metadata to Arweave through Irys so the URI is permanent and not tied to this deployment's origin.
+- A live end-to-end run on devnet in CI with a funded wallet, next to the in-process tests. I could not fund a test wallet while building this because the public faucet was rate limited for my IP, so the wallet-and-RPC path (signing in a real wallet, confirming on devnet) was not exercised end to end, only the program behaviour through LiteSVM.
+- Freeze authority and transfer-fee or other Token-2022 extensions as options.
+- Burn, revoke-authority and update-metadata actions for existing tokens.
+- A bundle-size pass: the wallet UI and Solana libraries make the first load about 358 kB.
+
+## Author
+
+Waleed Ilyas, Full Stack Engineer (MERN, Next.js, Solana).
+[GitHub](https://github.com/Waleed-Ilyas) · [LinkedIn](https://www.linkedin.com/in/waleed-ilyas-664839213) · waleedilyas99@gmail.com
+
+Released under the [MIT License](LICENSE).

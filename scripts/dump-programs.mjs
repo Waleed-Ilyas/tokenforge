@@ -15,7 +15,10 @@ for (const [file, id] of Object.entries(PROGRAMS)) {
   const programData = new PublicKey(program.data.subarray(4, 36));
   const acct = await conn.getAccountInfo(programData);
   if (!acct) throw new Error(`Program data for ${id} not found`);
-  const elf = acct.data.subarray(PROGRAMDATA_HEADER);
+  const padded = acct.data.subarray(PROGRAMDATA_HEADER);
+  // The programdata account is padded with zeros after the ELF. Trim to the end of the section header table.
+  const shoff = Number(padded.readBigUInt64LE(0x28));
+  const elf = padded.subarray(0, shoff + padded.readUInt16LE(0x3a) * padded.readUInt16LE(0x3c));
   writeFileSync(new URL(`../tests/fixtures/${file}`, import.meta.url), elf);
   console.log(`${file}: ${elf.length} bytes (${id})`);
 }
