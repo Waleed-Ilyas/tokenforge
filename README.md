@@ -76,7 +76,7 @@ pnpm lint && pnpm typecheck
 
 - **Unit tests** cover amount parsing (exactness, u64, decimals), form validation, the metadata link limit, and the shape of every transaction the builders produce.
 - **Integration tests (LiteSVM)** execute the builders against the real SPL Token, Token-2022 and Associated Token programs in an in-process Solana VM and check the resulting on-chain state: mint decimals and supply, authority revoked for fixed supply, the Token-2022 metadata-pointer and token-metadata extension contents, minting more, transfers to a wallet with no token account, and rejection of over-balance and wrong-decimals transfers.
-- **Not covered by the VM:** the Metaplex Token Metadata program. LiteSVM aborts (SIGABRT) when it executes the deployed program binary, on both 0.5.0 and 0.8.0, so for SPL tokens that instruction is removed before sending and checked structurally instead (program id, metadata PDA, mint account, instruction discriminator, name and symbol bytes). Whether Metaplex accepts it on devnet is therefore not verified here.
+- **Not covered by the VM:** the Metaplex Token Metadata program. LiteSVM aborts (SIGABRT) when it executes the deployed program binary, on both 0.5.0 and 0.8.0, so for SPL tokens that instruction is removed before sending and checked structurally instead (program id, metadata PDA, mint account, instruction discriminator, name and symbol bytes). The live devnet script below covers it instead: the metadata account is created on the real network and read back.
 - **Each scenario runs in its own Node process** (`tests/support/scenarios.ts`, launched by `tests/onchain.test.ts`), and the test passes when the script prints its `PASS` marker after every assertion held. This is a workaround: LiteSVM's native code aborts with `std::bad_alloc` when the process shuts down, and around the third transaction if several VMs share a process (reproduced on Linux with litesvm 0.5.0 and 0.8.0). The abort comes after the assertions ran, so the exit code is ignored and a failed assertion, which throws before the marker, still fails the test.
 - LiteSVM ships native binaries for Linux and macOS only, so on Windows that suite is skipped automatically. GitHub Actions runs it on every push.
 
@@ -88,7 +88,7 @@ pnpm lint && pnpm typecheck
 SOLANA_RPC_DEVNET=<devnet rpc url> DEVNET_KEYPAIR=<devnet-only keypair json> node --experimental-strip-types scripts/devnet-e2e.ts
 ```
 
-If the public faucet refuses the airdrop the script prints the address to fund at [faucet.solana.com](https://faucet.solana.com) and exits, so it can be re-run once funded. **Status:** written and confirmed to reach the funding step, but not yet run to completion because the faucet was exhausted when this was built.
+If the public faucet refuses the airdrop the script prints the address to fund at [faucet.solana.com](https://faucet.solana.com) and exits, so it can be re-run once funded. **Status:** run to completion on 2026-09-30 against real devnet, all checks passed (SPL create with Metaplex metadata read back from the chain, mint more, send to a new wallet, Token-2022 metadata extension, fixed supply rejected by the network). It uses the app's transaction builders with a keypair, not a browser wallet.
 
 ## Key engineering decisions
 
@@ -102,7 +102,7 @@ If the public faucet refuses the airdrop the script prints the address to fund a
 ## What I'd improve next
 
 - Upload images and metadata to Arweave through Irys so the URI is permanent and not tied to this deployment's origin.
-- Run `scripts/devnet-e2e.ts` to completion, and a manual pass with a browser wallet. I could not fund a test wallet while building this because the faucet was rate limited, so neither has happened yet. The SPL Token and Token-2022 behaviour is covered through LiteSVM, and the Metaplex metadata instruction is only checked structurally.
+- A manual pass with a real browser wallet (Phantom, Solflare or Backpack). The live script signs with a keypair, so the wallet-adapter signing path itself has not been exercised.
 - Freeze authority and transfer-fee or other Token-2022 extensions as options.
 - Burn, revoke-authority and update-metadata actions for existing tokens.
 - A bundle-size pass: the wallet UI and Solana libraries make the first load about 358 kB.
