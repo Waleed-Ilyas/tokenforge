@@ -80,6 +80,16 @@ pnpm lint && pnpm typecheck
 - **Each scenario runs in its own Node process** (`tests/support/scenarios.ts`, launched by `tests/onchain.test.ts`), and the test passes when the script prints its `PASS` marker after every assertion held. This is a workaround: LiteSVM's native code aborts with `std::bad_alloc` when the process shuts down, and around the third transaction if several VMs share a process (reproduced on Linux with litesvm 0.5.0 and 0.8.0). The abort comes after the assertions ran, so the exit code is ignored and a failed assertion, which throws before the marker, still fails the test.
 - LiteSVM ships native binaries for Linux and macOS only, so on Windows that suite is skipped automatically. GitHub Actions runs it on every push.
 
+### Live devnet check
+
+`scripts/devnet-e2e.ts` runs the same builders against real devnet with a throwaway keypair: SPL create with Metaplex metadata read back from the chain, Token-2022 create with its metadata extension, mint more, send to a wallet with no token account, and fixed supply rejecting a later mint. It covers the two things the in-process tests cannot, the Metaplex program and real RPC confirmation.
+
+```bash
+SOLANA_RPC_DEVNET=<devnet rpc url> DEVNET_KEYPAIR=<devnet-only keypair json> node --experimental-strip-types scripts/devnet-e2e.ts
+```
+
+If the public faucet refuses the airdrop the script prints the address to fund at [faucet.solana.com](https://faucet.solana.com) and exits, so it can be re-run once funded. **Status:** written and confirmed to reach the funding step, but not yet run to completion because the faucet was exhausted when this was built.
+
 ## Key engineering decisions
 
 - **Builders separate from signing.** The same instruction code runs in the browser and in tests.
@@ -92,7 +102,7 @@ pnpm lint && pnpm typecheck
 ## What I'd improve next
 
 - Upload images and metadata to Arweave through Irys so the URI is permanent and not tied to this deployment's origin.
-- A live end-to-end run on devnet with a funded wallet, next to the in-process tests. I could not fund a test wallet while building this because the public faucet was rate limited for my IP, so signing in a real wallet and confirming on devnet was not exercised end to end. The SPL Token and Token-2022 behaviour is covered through LiteSVM, and the Metaplex metadata instruction is only checked structurally.
+- Run `scripts/devnet-e2e.ts` to completion, and a manual pass with a browser wallet. I could not fund a test wallet while building this because the faucet was rate limited, so neither has happened yet. The SPL Token and Token-2022 behaviour is covered through LiteSVM, and the Metaplex metadata instruction is only checked structurally.
 - Freeze authority and transfer-fee or other Token-2022 extensions as options.
 - Burn, revoke-authority and update-metadata actions for existing tokens.
 - A bundle-size pass: the wallet UI and Solana libraries make the first load about 358 kB.
