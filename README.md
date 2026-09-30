@@ -8,7 +8,7 @@
 
 Create an SPL or Token-2022 token with a name, symbol and supply in a single transaction, then mint more or send it to anyone. Connect Phantom, Solflare or Backpack.
 
-**Live demo:** LIVE_URL · **Personal project.** Devnet only: the tokens have no value and nothing here sends a mainnet transaction.
+**Live demo:** https://tokenforge-tau.vercel.app · **Personal project.** Devnet only: the tokens have no value and nothing here sends a mainnet transaction.
 
 ## Demo accounts
 
