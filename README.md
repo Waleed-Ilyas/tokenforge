@@ -38,7 +38,7 @@ TokenForge deploys no program of its own. It composes these audited programs.
 
 ## Tech stack
 
-Next.js 15 (App Router), TypeScript strict, Tailwind CSS v4, `@solana/web3.js`, `@solana/spl-token`, `@solana/spl-token-metadata`, `@metaplex-foundation/mpl-token-metadata`, `@solana/wallet-adapter`, Zod, Vitest, LiteSVM, ESLint, Prettier, GitHub Actions.
+Next.js 15 (App Router), TypeScript strict, Tailwind CSS v4, `@solana/web3.js`, `@solana/spl-token`, `@solana/spl-token-metadata`, `@metaplex-foundation/mpl-token-metadata` (2.13), `@solana/wallet-adapter`, Zod, Vitest, LiteSVM, ESLint, Prettier, GitHub Actions.
 
 ## Architecture
 
@@ -51,7 +51,7 @@ flowchart LR
   B --> MPL[Metaplex Token Metadata<br/>SPL tokens]
   UI -->|send and confirm| RPC[(Solana devnet RPC)]
   MPL -. uri .-> API[/api/meta and /api/token-image/]
-  T[Vitest + LiteSVM<br/>real programs, in process] --> B
+  T[Vitest + LiteSVM<br/>SPL, Token-2022, ATA in process] --> B
 ```
 
 `lib/tx.ts` only builds instructions. The browser signs them with the wallet, the tests sign them with a keypair, so the exact code that ships is the code that is tested.
@@ -75,7 +75,8 @@ pnpm lint && pnpm typecheck
 ```
 
 - **Unit tests** cover amount parsing (exactness, u64, decimals), form validation, the metadata link limit, and the shape of every transaction the builders produce.
-- **Integration tests (LiteSVM)** execute the builders against the real SPL Token, Token-2022, Associated Token and Metaplex Token Metadata programs in an in-process Solana VM, and check the resulting on-chain state: mint decimals and supply, authority revoked for fixed supply, Metaplex metadata contents, Token-2022 metadata extension contents, minting more, transfers to a wallet with no token account, and rejection of over-balance and wrong-decimals transfers. `tests/fixtures/mpl_token_metadata.so` is the deployed program dumped by `scripts/dump-programs.mjs`.
+- **Integration tests (LiteSVM)** execute the builders against the real SPL Token, Token-2022 and Associated Token programs in an in-process Solana VM and check the resulting on-chain state: mint decimals and supply, authority revoked for fixed supply, the Token-2022 metadata-pointer and token-metadata extension contents, minting more, transfers to a wallet with no token account, and rejection of over-balance and wrong-decimals transfers.
+- **Not covered by the VM:** the Metaplex Token Metadata program. LiteSVM aborts (SIGABRT) when it executes the deployed program binary, on both 0.5.0 and 0.8.0, so for SPL tokens that instruction is removed before sending and checked structurally instead (program id, metadata PDA, mint account, instruction discriminator, name and symbol bytes). Whether Metaplex accepts it on devnet is therefore not verified here.
 - LiteSVM ships native binaries for Linux and macOS only, so on Windows that suite is skipped automatically. GitHub Actions runs it on every push.
 
 ## Key engineering decisions
@@ -90,7 +91,7 @@ pnpm lint && pnpm typecheck
 ## What I'd improve next
 
 - Upload images and metadata to Arweave through Irys so the URI is permanent and not tied to this deployment's origin.
-- A live end-to-end run on devnet in CI with a funded wallet, next to the in-process tests. I could not fund a test wallet while building this because the public faucet was rate limited for my IP, so the wallet-and-RPC path (signing in a real wallet, confirming on devnet) was not exercised end to end, only the program behaviour through LiteSVM.
+- A live end-to-end run on devnet with a funded wallet, next to the in-process tests. I could not fund a test wallet while building this because the public faucet was rate limited for my IP, so signing in a real wallet and confirming on devnet was not exercised end to end. The SPL Token and Token-2022 behaviour is covered through LiteSVM, and the Metaplex metadata instruction is only checked structurally.
 - Freeze authority and transfer-fee or other Token-2022 extensions as options.
 - Burn, revoke-authority and update-metadata actions for existing tokens.
 - A bundle-size pass: the wallet UI and Solana libraries make the first load about 358 kB.
