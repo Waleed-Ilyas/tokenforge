@@ -17,5 +17,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
+      - name: LiteSVM smoke (diagnostic)
+        run: node --experimental-strip-types scripts/litesvm-smoke.mjs
+        continue-on-error: true
       - run: pnpm test
       - run: pnpm build
