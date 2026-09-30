@@ -3,7 +3,7 @@
 // LiteSVM only ships native binaries for Linux and macOS, so on Windows this file is skipped and CI runs it.
 // The Metaplex Token Metadata program is NOT executed here: LiteSVM aborts (SIGABRT) when it runs the deployed
 // program binary. For SPL tokens the Metaplex instruction is stripped before sending and checked structurally instead.
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { Keypair, LAMPORTS_PER_SOL, Transaction, type TransactionInstruction } from "@solana/web3.js";
 import {
   ExtensionType,
@@ -51,7 +51,9 @@ suite("on-chain behaviour (LiteSVM)", () => {
     return { data: Buffer.from(a.data), owner: a.owner, lamports: Number(a.lamports), executable: a.executable };
   };
 
-  beforeAll(() => {
+  // A fresh VM per test. Reusing one LiteSVM instance across tests made the native code abort with std::bad_alloc
+  // on a later transaction (seen on Linux with litesvm 0.5.0 and 0.8.0), so tests share no VM state.
+  beforeEach(() => {
     svm = new lite!.LiteSVM();
     svm.airdrop(payer.publicKey, BigInt(100 * LAMPORTS_PER_SOL));
   });
