@@ -34,7 +34,7 @@
     "eslint": "^9",
     "eslint-config-next": "15.5.26",
     "eslint-config-prettier": "^10.1.8",
-    "litesvm": "0.5.0",
+    "litesvm": "0.8.0",
     "prettier": "^3.9.9",
     "tailwindcss": "^4",
     "typescript": "^5",
